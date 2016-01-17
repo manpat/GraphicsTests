@@ -37,8 +37,11 @@ void App::Run() {
 	
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 
-	window = SDL_CreateWindow("Shadow mapping", 
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_OPENGL);
+	constexpr u32 WindowWidth = 800;
+	constexpr u32 WindowHeight = 600;
+
+	window = SDL_CreateWindow("Cube mapping", 
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WindowWidth, WindowHeight, SDL_WINDOW_OPENGL);
 	if(!window) {
 		logger << "Window create failed";
 		throw 0;
@@ -92,24 +95,27 @@ void App::Run() {
 
 	u32 forwardFBO, lightFBO;
 	u32 fbTargets[4] {0};
-	u32 fbTargetTypes[4] {GL_RGBA8, GL_RGBA32F, GL_RGBA8, GL_DEPTH_COMPONENT24};
-	u32 fbTargetFormats[4] {GL_RGBA, GL_RGB, GL_RGB, GL_DEPTH_COMPONENT};
-	u32 fbTargetAttach[4] {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_DEPTH_ATTACHMENT};
 
-	glGenFramebuffers(1, &forwardFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, forwardFBO);
-	glGenTextures(4, fbTargets);
+	{	u32 fbTargetTypes[4] {GL_RGBA8, GL_RGBA32F, GL_RGBA8, GL_DEPTH_COMPONENT24};
+		u32 fbTargetFormats[4] {GL_RGBA, GL_RGB, GL_RGB, GL_DEPTH_COMPONENT};
+		u32 fbTargetAttach[4] {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_DEPTH_ATTACHMENT};
 
-	for(u32 i = 0; i < 4; i++) {
-		glBindTexture(GL_TEXTURE_2D, fbTargets[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, fbTargetTypes[i], 800, 600, 0, fbTargetFormats[i], GL_UNSIGNED_BYTE, nullptr);
+		glGenFramebuffers(1, &forwardFBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, forwardFBO);
+		glDrawBuffers(3, fbTargetAttach);
+		glGenTextures(4, fbTargets);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		for(u32 i = 0; i < 4; i++) {
+			glBindTexture(GL_TEXTURE_2D, fbTargets[i]);
+			glTexImage2D(GL_TEXTURE_2D, 0, fbTargetTypes[i], WindowWidth, WindowHeight, 0, fbTargetFormats[i], GL_UNSIGNED_BYTE, nullptr);
 
-		glFramebufferTexture2D(GL_FRAMEBUFFER, fbTargetAttach[i], GL_TEXTURE_2D, fbTargets[i], 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			glFramebufferTexture2D(GL_FRAMEBUFFER, fbTargetAttach[i], GL_TEXTURE_2D, fbTargets[i], 0);
+		}
 	}
 
 	u32 lightDepthBuffer;
@@ -118,7 +124,7 @@ void App::Run() {
 
 	glGenTextures(1, &lightDepthBuffer);
 	glBindTexture(GL_TEXTURE_2D, lightDepthBuffer);
-	constexpr u32 shadowmapSize = 4096;
+	constexpr u32 shadowmapSize = 2048;
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, shadowmapSize, shadowmapSize, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -147,18 +153,7 @@ void App::Run() {
 
 	glPointSize(4.f);
 
-	u32 triangle, quad;
-
-	{	std::vector<vec3> verts = {
-			vec3{0, 1, 0},
-			vec3{-0.8f, -0.7f, 0},
-			vec3{0.8f, -0.7f, 0},
-		};
-
-		glGenBuffers(1, &triangle);
-		glBindBuffer(GL_ARRAY_BUFFER, triangle);
-		glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(vec3), verts.data(), GL_STATIC_DRAW);
-	}
+	u32 quad;
 	{	std::vector<vec2> verts = {
 			vec2{-1, 1},
 			vec2{ 1,-1},
@@ -209,6 +204,7 @@ void App::Run() {
 					case SDLK_3: displayBuffer = 2; break;
 					case SDLK_4: displayBuffer = 3; break;
 					case SDLK_5: displayBuffer = 4; break;
+					case SDLK_6: displayBuffer = 5; break;
 
 					case SDLK_w: keys[0] = true; break;
 					case SDLK_s: keys[1] = true; break;
@@ -236,10 +232,10 @@ void App::Run() {
 			s32 mx, my;
 			SDL_GetMouseState(&mx, &my);
 			
-			f32 mdx = mx / 800.f * 2.f - 1.f;
-			f32 mdy = my / 600.f * 2.f - 1.f;
+			f32 mdx = mx / (f32)WindowWidth * 2.f - 1.f;
+			f32 mdy = my / (f32)WindowHeight * 2.f - 1.f;
 			
-			SDL_WarpMouseInWindow(window, 400, 300);
+			SDL_WarpMouseInWindow(window, WindowWidth/2, WindowHeight/2);
 
 			auto nyaw = mdx * 2.0 * PI * dt * 7.f;
 			auto npitch = mdy * 2.0 * PI * dt * 7.f;
@@ -273,7 +269,6 @@ void App::Run() {
 		// Forward
 		forwardProgram.Use();
 		glBindFramebuffer(GL_FRAMEBUFFER, forwardFBO);
-		glDrawBuffers(3, fbTargetAttach);
 
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
@@ -297,7 +292,7 @@ void App::Run() {
 		glUniformMatrix4fv(forwardProgram.GetUniform("projection"), 1, false, glm::value_ptr(lightProjMatrix));
 		model.Draw(forwardProgram);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(0,0,800,600);
+		glViewport(0,0,WindowWidth,WindowHeight);
 
 		// Post
 		if(!displayBuffer){
@@ -325,8 +320,11 @@ void App::Run() {
 		}else{
 			bufferProgram.Use();
 			glActiveTexture(GL_TEXTURE0);
-			// glBindTexture(GL_TEXTURE_2D, fbTargets[displayBuffer-1]);
-			glBindTexture(GL_TEXTURE_2D, lightDepthBuffer);
+			if(displayBuffer == 5) {
+				glBindTexture(GL_TEXTURE_2D, lightDepthBuffer);
+			}else{
+				glBindTexture(GL_TEXTURE_2D, fbTargets[displayBuffer-1]);
+			}
 			glUniform1i(bufferProgram.GetUniform("buffer"), 0);
 		}
 

@@ -12,8 +12,6 @@ out vec3 vnorm;
 
 void main() {
 	gl_Position = projection * view * model * vec4(vertex, 1);
-	// vpos = gl_Position.xyz;
 	vpos = (model * vec4(vertex, 1)).xyz;
-	vnorm = normal;
-	// vnorm = normalize((model * vec4(normal,1)).xyz);
+	vnorm = normalize(mat3(model) * normal);
 }
